@@ -20,7 +20,6 @@ def display_board(game_state):
     print(row2_display.rstrip())
     
     # Row 1 (single points) - displayed below, normal order: 1 2 3 4 5 6 7 8 9
-    # R2:9 aligns above R1:1, R2:8 above R1:2, etc.
     row1_available = game_state.get(1, set())
     row1_display = "Row 1: "
     for num in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
@@ -61,30 +60,18 @@ def get_valid_combinations(total, game_state):
     for r in range(1, len(all_tiles) + 1):
         for combo in combinations(all_tiles, r):
             if sum(num for row, num in combo) == total:
-                row1_used = set()
                 valid = True
                 combo_tiles = set(combo)  # For quick lookup
-                
+
                 for row, num in combo:
-                    if row == 1:
-                        # Row 1: can't use same number twice
-                        if num in row1_used:
-                            valid = False
-                            break
-                        row1_used.add(num)
-                    elif row == 2:
+                    if row == 2 and 1 in game_state:
                         # Row 2: can only use if corresponding row 1 tile (10-num) is either:
                         # 1. Not available in game_state, OR
-                        # 2. Also included in this same combo (new rule: can knock down both in same turn)
-                        if 1 in game_state:
-                            corresponding_row1 = 10 - num
-                            if corresponding_row1 in game_state[1]:
-                                # Check if the corresponding row 1 tile is in this combo
-                                if (1, corresponding_row1) not in combo_tiles:
-                                    # Corresponding row 1 tile exists but isn't in this move - invalid
-                                    valid = False
-                                    break
-                                # If it is in the combo, that's valid (new rule allows both)
+                        # 2. Also included in this same combo (can knock down both in same turn)
+                        corresponding_row1 = 10 - num
+                        if corresponding_row1 in game_state[1] and (1, corresponding_row1) not in combo_tiles:
+                            valid = False
+                            break
                 if valid:
                     valid_moves.append(combo)
 
@@ -110,7 +97,7 @@ def display_valid_moves_simple(valid_moves, target):
     if not valid_moves:
         return
     
-    print(f"\n📋 Valid moves for total of {target}:")
+    print(f"\nValid moves for total of {target}:")
     for i, move in enumerate(valid_moves, 1):
         move_list = sorted(move)
         move_str = " + ".join([f"R{row}:{num}" for row, num in move_list])
@@ -138,10 +125,6 @@ def roll_two_dice():
     die2 = random.randint(1, 6)
     return die1, die2
 
-def reset_game_state():
-    return {1: {1, 2, 3, 4, 5, 6, 7, 8, 9},
-            2: {1, 2, 3, 4, 5, 6, 7, 8, 9}}
-
 def main():
 
     # Init game state
@@ -159,36 +142,28 @@ def main():
     print("  - Goal: Flip all tiles to score 0 points")
     input("\nPress Enter to start the game...")
     
-    valid_move_flag = True
     turn = 1
 
     while True:
         display_board(game_state)
         print(f"--- Turn {turn} ---")
 
-        if valid_move_flag:
-            input("\nPress Enter to roll the dice...")
-            score = calculate_score(game_state)
-            if score <= 6:
-                d1 = roll_one_die()
-                d2 = 0
-                print(f"🎲 Rolled: {d1} (single die mode - score is {score})")
-            else:
-                d1, d2 = roll_two_dice()
-                print(f"🎲 Rolled: {d1} + {d2} = {d1 + d2}")
+        input("\nPress Enter to roll the dice...")
+        score = calculate_score(game_state)
+        if score <= 6:
+            d1 = roll_one_die()
+            d2 = 0
+            print(f"🎲 Rolled: {d1} (single die mode - score is {score})")
         else:
-            print("\n❌ Invalid move detected. Restarting the game.")
-            game_state = reset_game_state()
-            valid_move_flag = True
-            turn = 1
-            continue
+            d1, d2 = roll_two_dice()
+            print(f"🎲 Rolled: {d1} + {d2} = {d1 + d2}")
 
         d_total = d1 + d2
         valid_moves = get_valid_combinations(d_total, game_state)
 
         if not valid_moves:
-            print(f"\n❌ No valid moves available for total of {d_total}!")
-            print(f"🏁 Game Over! Final score: {calculate_score(game_state)} points")
+            print(f"\nNo valid moves available for total of {d_total}")
+            print(f"Game Over. Final score: {calculate_score(game_state)} points")
             display_board(game_state)
             break
         
@@ -205,7 +180,7 @@ def main():
             try:
                 move_number = int(user_input)
                 if move_number < 1 or move_number > len(valid_moves):
-                    print(f"❌ Invalid move number! Please enter a number between 1 and {len(valid_moves)}.")
+                    print(f"Invalid move. Please enter a number between 1 and {len(valid_moves)}.")
                     continue
                 
                 # Get the selected move
@@ -215,7 +190,7 @@ def main():
                 move_valid = True
                 for row, num in selected_move:
                     if not check_valid_move(row, num, game_state):
-                        print(f"❌ Invalid move! Some tiles in move #{move_number} are no longer available.")
+                        print(f"Invalid move. Some tiles in move #{move_number} are no longer available.")
                         move_valid = False
                         break
                 
@@ -224,7 +199,7 @@ def main():
                 
                 # Apply the move
                 move_display = " + ".join([f"R{row}:{num}" for row, num in sorted(selected_move)])
-                print(f"\n✅ Selected move #{move_number}: {move_display} = {d_total}")
+                print(f"\nSelected move #{move_number}: {move_display} = {d_total}")
                 
                 for row, num in selected_move:
                     flip_tile(row, num, game_state)
@@ -232,12 +207,12 @@ def main():
                 break
                 
             except ValueError:
-                print("❌ Invalid input! Please enter a number.")
+                print("Invalid input. Please enter a number.")
                 continue
 
         if check_win(game_state):
             print("\n" + "🎉"*25)
-            print("🎉 CONGRATULATIONS! You shut the box! 🎉")
+            print("BANG! You shut the box.")
             print("🎉"*25)
             display_board(game_state)
             break
